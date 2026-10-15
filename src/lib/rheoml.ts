@@ -157,14 +157,11 @@ export function parseRheoML(xmlText: string, fileName: string, droppedFolder?: s
 
   const text = (selector: string) => root.querySelector(selector)?.textContent?.trim() ?? ''
   const baseName = fileName.replace(/\.xml$/i, '')
-  const sessionFolder =
-    sessionFolderFrom(text('Source > RawDataFile')) ??
-    (droppedFolder ? stripStatusMarker(droppedFolder) : null) ??
-    'Reologia'
+  const folder = sessionFolderFrom(text('Source > RawDataFile')) ?? droppedFolder
 
   return {
     fileName: baseName,
-    sessionFolder,
+    sessionFolder: folder ? stripStatusMarker(folder) : 'Reologia',
     sampleName: text('Sample > SampleName') || baseName,
     measuredAt: `${text('Source > Date')}T${text('Source > Time')}`,
     rawHeader,

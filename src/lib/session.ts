@@ -5,6 +5,7 @@ import type { Measurement, Point } from './rheoml'
 
 /** Rows before the first one at this frequency are ignored for averages. */
 export const START_FREQUENCY_HZ = 0.1
+export const START_FREQUENCY_LABEL = `${String(START_FREQUENCY_HZ).replace('.', ',')} Hz`
 
 const FREQUENCY = 'Frequency'
 const AVERAGED_FIELDS = ['StorageModulus', 'LossModulus'] as const
@@ -31,19 +32,29 @@ export interface Session {
 export type Formula = { formula: string; result: number | null }
 export type GridCell = string | number | Formula | null
 
+// Sweep points are ~26% apart, so 0.01% only absorbs rounding in the export.
 const sameFrequency = (a: number | undefined, b: number | undefined) =>
-  a !== undefined && b !== undefined && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b))
+  a !== undefined && b !== undefined && Math.abs(a - b) <= 1e-4 * Math.abs(b)
+
+/** Sample names that differ only in case or spacing are the same sample. */
+const sampleKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase()
+
+export const rawFileName = (session: Session) => `${session.folder}.xlsx`
+export const averageFileName = (session: Session) => `${session.folder} average.xlsx`
 
 export function rowsFromStartFrequency(points: Point[]): Point[] | null {
   const start = points.findIndex((p) => sameFrequency(p[FREQUENCY], START_FREQUENCY_HZ))
   return start === -1 ? null : points.slice(start)
 }
 
-/** Excel tab names: max 31 chars, no : \ / ? * [ ], unique ignoring case. */
+/**
+ * Excel tab names: max 31 chars, no : \ / ? * [ ], no leading or trailing
+ * apostrophe, not "History", unique ignoring case.
+ */
 export function excelSheetNames(names: string[]): string[] {
-  const used = new Set<string>()
+  const used = new Set<string>(['history'])
   return names.map((name) => {
-    const base = name.replace(/[:\\/?*[\]]/g, '_').replace(/^'+|'+$/g, '').slice(0, 31) || 'Hoja'
+    const base = name.replace(/[:\\/?*[\]]/g, '_').slice(0, 31).replace(/^'+|'+$/g, '') || 'Hoja'
     let candidate = base
     for (let n = 2; used.has(candidate.toLowerCase()); n++) {
       const suffix = `_${n}`
@@ -56,40 +67,66 @@ export function excelSheetNames(names: string[]): string[] {
 
 function renameWarnings(names: string[], sheetNames: string[], what: string): string[] {
   return names.flatMap((name, i) =>
-    name === sheetNames[i] ? [] : [`La pestaña de ${what} «${name}» se llama «${sheetNames[i]}» porque Excel no admite ese nombre.`],
+    name === sheetNames[i]
+      ? []
+      : [
+          `La pestaña de ${what} «${name}» se llama «${sheetNames[i]}» porque Excel no admite ese nombre o ya hay otra pestaña que se llama igual.`,
+        ],
   )
 }
 
 const byMeasuredAt = (a: Measurement, b: Measurement) =>
   a.measuredAt.localeCompare(b.measuredAt) || a.fileName.localeCompare(b.fileName)
 
+const FULL_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/
+
+/** The same run exported twice has the same sample and start time: keep one. */
+function withoutDuplicateExports(ordered: Measurement[], warnings: string[]): Measurement[] {
+  const seen = new Map<string, Measurement>()
+  return ordered.filter((m) => {
+    if (!FULL_TIMESTAMP.test(m.measuredAt)) return true
+    const key = `${sampleKey(m.sampleName)}|${m.measuredAt}`
+    const first = seen.get(key)
+    if (!first) {
+      seen.set(key, m)
+      return true
+    }
+    warnings.push(
+      `«${m.fileName}» es la misma medida que «${first.fileName}» (exportada dos veces): solo se usa «${first.fileName}».`,
+    )
+    return false
+  })
+}
+
 function buildSession(folder: string, measurements: Measurement[]): Session {
-  const ordered = [...measurements].sort(byMeasuredAt)
   const warnings: string[] = []
+  const ordered = withoutDuplicateExports([...measurements].sort(byMeasuredAt), warnings)
 
   const rawNames = ordered.map((m) => m.fileName)
   const rawSheetNames = excelSheetNames(rawNames)
   warnings.push(...renameWarnings(rawNames, rawSheetNames, 'la medida'))
 
-  const bySample = new Map<string, Replicate[]>()
+  const bySample = new Map<string, { name: string; replicates: Replicate[] }>()
   for (const measurement of ordered) {
     const rows = rowsFromStartFrequency(measurement.points)
     if (!rows) {
       warnings.push(
-        `«${measurement.fileName}» no tiene ninguna fila a ${START_FREQUENCY_HZ} Hz: está en el Excel completo pero no en el de medias.`,
+        `«${measurement.fileName}» no tiene ninguna fila a ${START_FREQUENCY_LABEL}: está en el Excel completo pero no en el de medias.`,
       )
       continue
     }
-    const replicates = bySample.get(measurement.sampleName) ?? []
-    replicates.push({ measurement, rows })
-    bySample.set(measurement.sampleName, replicates)
+    const key = sampleKey(measurement.sampleName)
+    const group = bySample.get(key) ?? { name: measurement.sampleName, replicates: [] }
+    group.replicates.push({ measurement, rows })
+    bySample.set(key, group)
   }
 
-  const sampleNames = [...bySample.keys()]
+  const groups = [...bySample.values()]
+  const sampleNames = groups.map((g) => g.name)
   const sampleSheetNames = excelSheetNames(sampleNames)
   warnings.push(...renameWarnings(sampleNames, sampleSheetNames, 'la muestra'))
 
-  const samples = sampleNames.map((name, i) => ({ name, sheetName: sampleSheetNames[i], replicates: bySample.get(name)! }))
+  const samples = groups.map((g, i) => ({ ...g, sheetName: sampleSheetNames[i] }))
   for (const sample of samples) {
     if (!frequenciesMatch(sample)) {
       warnings.push(`En «${sample.name}» las medidas no tienen las mismas frecuencias: revisa sus medias a mano.`)
@@ -106,7 +143,11 @@ function buildSession(folder: string, measurements: Measurement[]): Session {
 
 export function buildSessions(measurements: Measurement[]): Session[] {
   const byFolder = new Map<string, Measurement[]>()
-  for (const m of measurements) byFolder.set(m.sessionFolder, [...(byFolder.get(m.sessionFolder) ?? []), m])
+  for (const m of measurements) {
+    const group = byFolder.get(m.sessionFolder)
+    if (group) group.push(m)
+    else byFolder.set(m.sessionFolder, [m])
+  }
   return [...byFolder.entries()]
     .map(([folder, ms]) => buildSession(folder, ms))
     .sort((a, b) => a.folder.localeCompare(b.folder))

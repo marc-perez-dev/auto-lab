@@ -1,8 +1,8 @@
 import ExcelJS from 'exceljs'
 import { describe, expect, it } from 'vitest'
 import { parseRheoML } from '../lib/rheoml'
-import { buildSessions } from '../lib/session'
-import { averageFileName, buildAverageWorkbook, buildRawWorkbook, rawFileName } from '../lib/workbooks'
+import { averageFileName, buildSessions, rawFileName } from '../lib/session'
+import { buildAverageWorkbook, buildRawWorkbook } from '../lib/workbooks'
 import { amplitudeSweep, frequencySweep, rheomlXml } from './fixture'
 
 async function roundTrip(wb: ExcelJS.Workbook): Promise<ExcelJS.Workbook> {
@@ -42,6 +42,19 @@ describe('workbooks', () => {
     expect(ws.getCell('Z18').value).toBe(0.1)
     expect(ws.getCell('H2').value).toBeNull()
     expect(Object.keys((ws as unknown as { tables: object }).tables)).toEqual(['Tabla1'])
+  })
+
+  it('writes a measurement without data as a header row, not an empty table', async () => {
+    const [empty] = buildSessions([parseRheoML(rheomlXml({ sample: 'S', file: 'S', segments: [] }), 'S.xml')])
+    const ws = (await roundTrip(buildRawWorkbook(empty))).getWorksheet('S')!
+    expect(ws.getCell('A1').value).toBe('Organization')
+    expect(ws.rowCount).toBe(1)
+    expect(Object.keys((ws as unknown as { tables: object }).tables)).toEqual([])
+  })
+
+  it('refuses to write an averages file without samples', () => {
+    const [noSweep] = buildSessions([parseRheoML(rheomlXml({ sample: 'S', file: 'S', segments: [amplitudeSweep()] }), 'S.xml')])
+    expect(() => buildAverageWorkbook(noSweep)).toThrow()
   })
 
   it('writes one tab per sample with live AVERAGE formulas', async () => {

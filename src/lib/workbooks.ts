@@ -30,6 +30,12 @@ export function buildRawWorkbook(session: Session): ExcelJS.Workbook {
   const wb = new ExcelJS.Workbook()
   session.measurements.forEach(({ measurement, sheetName }, i) => {
     const ws = wb.addWorksheet(sheetName)
+    fitColumns(ws, [measurement.rawHeader, ...measurement.rawRows])
+    // Excel considers a table without data rows corrupt.
+    if (measurement.rawRows.length === 0) {
+      ws.addRow(measurement.rawHeader)
+      return
+    }
     ws.addTable({
       name: `Tabla${i + 1}`,
       ref: 'A1',
@@ -45,7 +51,6 @@ export function buildRawWorkbook(session: Session): ExcelJS.Workbook {
         }
       }),
     )
-    fitColumns(ws, [measurement.rawHeader, ...measurement.rawRows])
   })
   return wb
 }
@@ -59,6 +64,8 @@ function gridValue(cell: GridCell): ExcelJS.CellValue {
 
 /** One tab per sample with the replicates side by side and their average. */
 export function buildAverageWorkbook(session: Session): ExcelJS.Workbook {
+  // A workbook without tabs cannot be opened by Excel.
+  if (session.samples.length === 0) throw new Error('No samples to average')
   const wb = new ExcelJS.Workbook()
   for (const sample of session.samples) {
     const ws = wb.addWorksheet(sample.sheetName)
@@ -72,6 +79,3 @@ export function buildAverageWorkbook(session: Session): ExcelJS.Workbook {
 export async function toBlob(wb: ExcelJS.Workbook): Promise<Blob> {
   return new Blob([await wb.xlsx.writeBuffer()], { type: XLSX_MIME })
 }
-
-export const rawFileName = (session: Session) => `${session.folder}.xlsx`
-export const averageFileName = (session: Session) => `${session.folder} average.xlsx`

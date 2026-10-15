@@ -2,7 +2,8 @@ import { useRef, useState, type ChangeEvent } from 'react'
 import { filesFromDrop, filesFromInput, type PickedFile } from '../lib/files'
 
 interface Props {
-  onFiles: (files: PickedFile[]) => void
+  /** Receives a promise because walking a dropped folder takes a while. */
+  onFiles: (files: Promise<PickedFile[]>) => void
   busy: boolean
 }
 
@@ -12,7 +13,7 @@ export function DropZone({ onFiles, busy }: Props) {
   const fileInput = useRef<HTMLInputElement | null>(null)
 
   const onPicked = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.length) onFiles(filesFromInput(e.target.files))
+    if (e.target.files?.length) onFiles(Promise.resolve(filesFromInput(e.target.files)))
     e.target.value = ''
   }
 
@@ -26,7 +27,7 @@ export function DropZone({ onFiles, busy }: Props) {
       onDrop={(e) => {
         e.preventDefault()
         setOver(false)
-        filesFromDrop(e.dataTransfer).then(onFiles)
+        if (!busy) onFiles(filesFromDrop(e.dataTransfer))
       }}
       className={`flex flex-col items-center gap-4 rounded-lg border-2 border-dashed px-6 py-12 text-center transition-colors ${
         over ? 'border-earth-green bg-stone-200' : 'border-stone-400 bg-stone-50'

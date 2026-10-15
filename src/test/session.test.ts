@@ -14,6 +14,10 @@ describe('rowsFromStartFrequency', () => {
     expect(rows[0].StorageModulus).toBe(100)
   })
 
+  it('tolerates rounding in the exported frequency', () => {
+    expect(rowsFromStartFrequency([{ Frequency: 1 }, { Frequency: 0.0999999 }, { Frequency: 0.125892 }])).toHaveLength(2)
+  })
+
   it('returns null when there is no 0.1 Hz row', () => {
     const m = parse({ sample: 'S', file: 'S', segments: [amplitudeSweep()] })
     expect(rowsFromStartFrequency(m.points)).toBeNull()
@@ -53,7 +57,29 @@ describe('buildSessions', () => {
     const [s] = buildSessions([...day, parse({ sample: 'X', file: 'X', segments: [amplitudeSweep()] })])
     expect(s.measurements).toHaveLength(6)
     expect(s.samples.map((x) => x.name)).not.toContain('X')
-    expect(s.warnings).toEqual([expect.stringContaining('«X» no tiene ninguna fila a 0.1 Hz')])
+    expect(s.warnings).toEqual([expect.stringContaining('«X» no tiene ninguna fila a 0,1 Hz')])
+  })
+
+  it('treats sample names differing only in case or spacing as the same sample', () => {
+    const [s] = buildSessions([
+      parse({ sample: 'HAtyr 100', file: 'HAtyr 100', time: '10:00:00', segments: [frequencySweep(1)] }),
+      parse({ sample: 'HATyr  100 ', file: 'HATyr 100 (1)', time: '10:10:00', segments: [frequencySweep(2)] }),
+    ])
+    expect(s.samples.map((x) => [x.name, x.replicates.length])).toEqual([['HAtyr 100', 2]])
+    expect(s.warnings).toEqual([])
+  })
+
+  it('uses a measurement exported twice only once', () => {
+    const run = { sample: 'HATyr 100', time: '10:43:59', segments: [amplitudeSweep(), frequencySweep(100)] }
+    const [s] = buildSessions([
+      parseRheoML(rheomlXml({ ...run, file: 'HATyr 100' }), 'HATyr 100-2.xml'),
+      parseRheoML(rheomlXml({ ...run, file: 'HATyr 100' }), 'HATyr 100.xml'),
+    ])
+    expect(s.measurements.map((m) => m.sheetName)).toEqual(['HATyr 100'])
+    expect(s.samples[0].replicates).toHaveLength(1)
+    expect(s.warnings).toEqual([
+      '«HATyr 100-2» es la misma medida que «HATyr 100» (exportada dos veces): solo se usa «HATyr 100».',
+    ])
   })
 
   it('warns when replicates were measured at different frequencies', () => {
@@ -116,6 +142,11 @@ describe('excelSheetNames', () => {
     expect(excelSheetNames(['a/b', 'HAtyr 100', 'HATYR 100', 'x'.repeat(40)])).toEqual([
       'a_b', 'HAtyr 100', 'HATYR 100_2', 'x'.repeat(31),
     ])
+  })
+
+  it('avoids names Excel reserves or rejects at the edges', () => {
+    const apostropheAt31 = `${'a'.repeat(30)}'b`
+    expect(excelSheetNames(['History', apostropheAt31, "'quoted'"])).toEqual(['History_2', 'a'.repeat(30), 'quoted'])
   })
 })
 

@@ -59,6 +59,16 @@ describe('parseRheoML', () => {
     expect(parseRheoML(xml, 'HATyr 100 (1)-2.xml').fileName).toBe('HATyr 100 (1)-2')
   })
 
+  it('drops the status marker from the folder TRIOS saved to', () => {
+    const marked = rheomlXml({
+      sample: 'S',
+      file: 'S',
+      rawDataFile: 'C:\\Users\\lab\\2026-10-06 HAGel D1 N2 (POR HACER)\\S.tri',
+      segments: [frequencySweep(1)],
+    })
+    expect(parseRheoML(marked, 'S.xml').sessionFolder).toBe('2026-10-06 HAGel D1 N2')
+  })
+
   it('falls back to the dropped folder without its status marker', () => {
     const noRaw = rheomlXml({ sample: 'S', file: 'S', rawDataFile: null, segments: [frequencySweep(1)] })
     expect(parseRheoML(noRaw, 'S.xml', '2026-10-06 HAGel D1 N2 (POR HACER)').sessionFolder).toBe('2026-10-06 HAGel D1 N2')

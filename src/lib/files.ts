@@ -1,6 +1,6 @@
 // Collects the files she drops or picks, remembering the folder each came from.
 
-import { NotRheoMLError, parseRheoML, type Measurement } from './rheoml'
+import { NotRheoMLError, parseRheoML, sessionFolderFrom, type Measurement } from './rheoml'
 import { buildSessions, type Session } from './session'
 
 export interface PickedFile {
@@ -38,35 +38,34 @@ async function collectEntry(entry: FileSystemEntry, folder?: string): Promise<Pi
 }
 
 export async function filesFromDrop(dataTransfer: DataTransfer): Promise<PickedFile[]> {
-  // Entries must be taken synchronously, before the drop event ends.
-  const entries = Array.from(dataTransfer.items)
-    .map((item) => item.webkitGetAsEntry())
-    .filter((e): e is FileSystemEntry => e !== null)
-  if (entries.length === 0) return Array.from(dataTransfer.files).map((file) => ({ file }))
-  return (await Promise.all(entries.map((e) => collectEntry(e)))).flat()
+  // Entries and files must be taken synchronously, before the drop event ends.
+  const dropped = Array.from(dataTransfer.items)
+    .filter((item) => item.kind === 'file')
+    .map((item) => item.webkitGetAsEntry() ?? item.getAsFile())
+  const picked = await Promise.all(
+    dropped.map((d) => (d === null ? [] : d instanceof File ? [{ file: d }] : collectEntry(d))),
+  )
+  return picked.flat()
 }
 
 export function filesFromInput(list: FileList): PickedFile[] {
-  return Array.from(list).map((file) => {
-    const parts = file.webkitRelativePath.split('/')
-    return { file, folder: parts.length >= 2 ? parts[parts.length - 2] : undefined }
-  })
+  return Array.from(list).map((file) => ({ file, folder: sessionFolderFrom(file.webkitRelativePath) ?? undefined }))
 }
 
 export async function processFiles(picked: PickedFile[]): Promise<ProcessResult> {
   // Anything else (e.g. the .tri originals) is not needed.
   const xmls = picked.filter(({ file }) => file.name.toLowerCase().endsWith('.xml'))
-  const measurements: Measurement[] = []
-  const rejected: ProcessResult['rejected'] = []
-
-  for (const { file, folder } of xmls) {
-    try {
-      measurements.push(parseRheoML(await file.text(), file.name, folder))
-    } catch (error) {
-      const reason = error instanceof NotRheoMLError ? 'no es un archivo exportado del reómetro' : 'no se ha podido leer'
-      rejected.push({ name: file.name, reason })
-    }
-  }
-
+  const parsed = await Promise.all(
+    xmls.map(async ({ file, folder }) => {
+      try {
+        return parseRheoML(await file.text(), file.name, folder)
+      } catch (error) {
+        const reason = error instanceof NotRheoMLError ? 'no es un archivo exportado del reómetro' : 'no se ha podido leer'
+        return { name: file.name, reason }
+      }
+    }),
+  )
+  const measurements = parsed.filter((p): p is Measurement => 'points' in p)
+  const rejected = parsed.filter((p): p is ProcessResult['rejected'][number] => 'reason' in p)
   return { sessions: buildSessions(measurements), rejected }
 }

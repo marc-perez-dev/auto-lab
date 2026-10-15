@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Session } from '../lib/session'
+import { averageFileName, rawFileName, START_FREQUENCY_LABEL, type Session } from '../lib/session'
 
 type Kind = 'raw' | 'average'
 
@@ -22,7 +22,7 @@ export function SessionCard({ session }: { session: Session }) {
     try {
       const wb = await import('../lib/workbooks')
       const workbook = kind === 'raw' ? wb.buildRawWorkbook(session) : wb.buildAverageWorkbook(session)
-      saveBlob(await wb.toBlob(workbook), kind === 'raw' ? wb.rawFileName(session) : wb.averageFileName(session))
+      saveBlob(await wb.toBlob(workbook), kind === 'raw' ? rawFileName(session) : averageFileName(session))
     } catch (e) {
       console.error(e)
       setError('No se ha podido crear el Excel. Recarga la página y vuelve a intentarlo.')
@@ -49,8 +49,8 @@ export function SessionCard({ session }: { session: Session }) {
           <li key={sample.name} className="flex flex-col gap-1.5 py-2.5 sm:flex-row sm:items-baseline sm:gap-4">
             <span className="font-semibold sm:w-48 sm:shrink-0">{sample.name}</span>
             <span className="flex flex-wrap gap-1.5">
-              {sample.replicates.map((r) => (
-                <span key={r.measurement.fileName} className="rounded bg-stone-200 px-2 py-0.5 text-sm text-stone-800">
+              {sample.replicates.map((r, i) => (
+                <span key={i} className="rounded bg-stone-200 px-2 py-0.5 text-sm text-stone-800">
                   {r.measurement.fileName}
                 </span>
               ))}
@@ -63,8 +63,8 @@ export function SessionCard({ session }: { session: Session }) {
         <div className="rounded-md border-l-4 border-amber-600 bg-amber-50 px-4 py-3 text-amber-900">
           <p className="font-semibold">Revisa esto:</p>
           <ul className="list-disc pl-5">
-            {session.warnings.map((w) => (
-              <li key={w}>{w}</li>
+            {session.warnings.map((w, i) => (
+              <li key={i}>{w}</li>
             ))}
           </ul>
         </div>
@@ -73,11 +73,20 @@ export function SessionCard({ session }: { session: Session }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <button type="button" className="btn-primary flex-col" disabled={busy !== null} onClick={() => download('raw')}>
           <span>{busy === 'raw' ? 'Creando…' : 'Descargar Excel completo'}</span>
-          <span className="text-xs font-normal opacity-80 break-all">{session.folder}.xlsx</span>
+          <span className="text-xs font-normal opacity-80 break-all">{rawFileName(session)}</span>
         </button>
-        <button type="button" className="btn-primary flex-col" disabled={busy !== null} onClick={() => download('average')}>
+        <button
+          type="button"
+          className="btn-primary flex-col disabled:cursor-not-allowed"
+          disabled={busy !== null || sampleCount === 0}
+          onClick={() => download('average')}
+        >
           <span>{busy === 'average' ? 'Creando…' : 'Descargar Excel de medias'}</span>
-          <span className="text-xs font-normal opacity-80 break-all">{session.folder} average.xlsx</span>
+          <span className="text-xs font-normal opacity-80 break-all">
+            {sampleCount === 0
+              ? `Sin medias: ninguna medida tiene fila a ${START_FREQUENCY_LABEL}`
+              : averageFileName(session)}
+          </span>
         </button>
       </div>
       {error && <p className="text-red-700">{error}</p>}
