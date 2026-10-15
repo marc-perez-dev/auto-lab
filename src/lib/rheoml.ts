@@ -25,7 +25,6 @@ export class NotRheoMLError extends Error {}
 const NUMBER = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/
 const TIME = /^(\d{2}):(\d{2}):(\d{2})$/
-const STATUS_MARKER = /\s*\((POR HACER|YA HECHO)\)\s*$/i
 
 function toCell(text: string | null): RawCell {
   const value = (text ?? '').trim()
@@ -83,11 +82,6 @@ function flattenFixedPart(el: Element, namer: ColumnNamer, out: Field[]) {
 export function sessionFolderFrom(rawDataFile: string | null | undefined): string | null {
   const parts = (rawDataFile ?? '').trim().split(/[\\/]/).filter(Boolean)
   return parts.length >= 2 ? parts[parts.length - 2] : null
-}
-
-/** "2026-10-06 HAGel D1 N2 (POR HACER)" -> "2026-10-06 HAGel D1 N2" */
-export function stripStatusMarker(folder: string): string {
-  return folder.replace(STATUS_MARKER, '')
 }
 
 /**
@@ -161,7 +155,7 @@ export function parseRheoML(xmlText: string, fileName: string, droppedFolder?: s
 
   return {
     fileName: baseName,
-    sessionFolder: folder ? stripStatusMarker(folder) : 'Reologia',
+    sessionFolder: folder ?? 'Reologia',
     sampleName: text('Sample > SampleName') || baseName,
     measuredAt: `${text('Source > Date')}T${text('Source > Time')}`,
     rawHeader,

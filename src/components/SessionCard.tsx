@@ -39,8 +39,8 @@ export function SessionCard({ session }: { session: Session }) {
       <header>
         <h2 className="text-xl font-bold break-words">{session.folder}</h2>
         <p className="text-stone-600">
-          {measurementCount} {measurementCount === 1 ? 'medida' : 'medidas'} · {sampleCount}{' '}
-          {sampleCount === 1 ? 'muestra' : 'muestras'}
+          {measurementCount} {measurementCount === 1 ? 'medida' : 'medidas'} de {sampleCount}{' '}
+          {sampleCount === 1 ? 'muestra' : 'muestras'}. Comprueba que cada muestra tiene sus réplicas.
         </p>
       </header>
 
@@ -73,7 +73,7 @@ export function SessionCard({ session }: { session: Session }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <button type="button" className="btn-primary flex-col" disabled={busy !== null} onClick={() => download('raw')}>
           <span>{busy === 'raw' ? 'Creando…' : 'Descargar Excel completo'}</span>
-          <span className="text-xs font-normal opacity-80 break-all">{rawFileName(session)}</span>
+          <span className="text-xs font-normal opacity-80">Una pestaña por medida</span>
         </button>
         <button
           type="button"
@@ -82,10 +82,10 @@ export function SessionCard({ session }: { session: Session }) {
           onClick={() => download('average')}
         >
           <span>{busy === 'average' ? 'Creando…' : 'Descargar Excel de medias'}</span>
-          <span className="text-xs font-normal opacity-80 break-all">
+          <span className="text-xs font-normal opacity-80">
             {sampleCount === 0
-              ? `Sin medias: ninguna medida tiene fila a ${START_FREQUENCY_LABEL}`
-              : averageFileName(session)}
+              ? `No disponible: ninguna medida llega a ${START_FREQUENCY_LABEL}`
+              : 'Una pestaña por muestra, con su media'}
           </span>
         </button>
       </div>

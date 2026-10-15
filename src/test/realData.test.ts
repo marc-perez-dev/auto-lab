@@ -91,7 +91,6 @@ describe.runIf(dir)('real lab data', () => {
     for (const folder of folders.filter((f) => f !== day1)) {
       const session = loadSession(folder)
       expect(session.warnings).toEqual([])
-      expect(session.folder).toBe(folder.replace(/ \(POR HACER\)$/, ''))
       expect(session.measurements).toHaveLength(15)
       expect(session.samples.map((s) => s.replicates.length)).toEqual([3, 3, 3, 3, 3])
       expect(session.samples.every((s) => s.replicates.every((r) => r.rows.length === 20))).toBe(true)

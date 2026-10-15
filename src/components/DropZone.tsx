@@ -29,7 +29,7 @@ export function DropZone({ onFiles, busy }: Props) {
         setOver(false)
         if (!busy) onFiles(filesFromDrop(e.dataTransfer))
       }}
-      className={`flex flex-col items-center gap-4 rounded-lg border-2 border-dashed px-6 py-12 text-center transition-colors ${
+      className={`flex flex-col items-center gap-3 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors ${
         over ? 'border-earth-green bg-stone-200' : 'border-stone-400 bg-stone-50'
       }`}
     >
@@ -39,16 +39,19 @@ export function DropZone({ onFiles, busy }: Props) {
       </svg>
       <div>
         <p className="text-lg font-semibold">{busy ? 'Leyendo archivos…' : 'Arrastra aquí la carpeta del ensayo'}</p>
-        <p className="text-stone-600">o los archivos .xml sueltos</p>
+        <p className="text-stone-600">con los .xml exportados de TRIOS</p>
       </div>
-      <div className="flex flex-wrap justify-center gap-3">
-        <button type="button" className="btn-secondary" disabled={busy} onClick={() => folderInput.current?.click()}>
-          Elegir carpeta
-        </button>
-        <button type="button" className="btn-secondary" disabled={busy} onClick={() => fileInput.current?.click()}>
-          Elegir archivos .xml
-        </button>
-      </div>
+      <button type="button" className="btn-primary" disabled={busy} onClick={() => folderInput.current?.click()}>
+        Elegir carpeta
+      </button>
+      <button
+        type="button"
+        className="text-sm text-stone-600 underline underline-offset-2 hover:text-stone-900"
+        disabled={busy}
+        onClick={() => fileInput.current?.click()}
+      >
+        o elegir archivos sueltos
+      </button>
       <input
         ref={(el) => {
           folderInput.current = el

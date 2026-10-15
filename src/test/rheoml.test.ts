@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { NotRheoMLError, parseRheoML, stripStatusMarker } from '../lib/rheoml'
+import { NotRheoMLError, parseRheoML } from '../lib/rheoml'
 import { amplitudeSweep, frequencySweep, rheomlXml } from './fixture'
 
 // Column names Excel gives the same file when opened "as an XML table".
@@ -59,31 +59,14 @@ describe('parseRheoML', () => {
     expect(parseRheoML(xml, 'HATyr 100 (1)-2.xml').fileName).toBe('HATyr 100 (1)-2')
   })
 
-  it('drops the status marker from the folder TRIOS saved to', () => {
-    const marked = rheomlXml({
-      sample: 'S',
-      file: 'S',
-      rawDataFile: 'C:\\Users\\lab\\2026-10-06 HAGel D1 N2 (POR HACER)\\S.tri',
-      segments: [frequencySweep(1)],
-    })
-    expect(parseRheoML(marked, 'S.xml').sessionFolder).toBe('2026-10-06 HAGel D1 N2')
-  })
-
-  it('falls back to the dropped folder without its status marker', () => {
+  it('falls back to the folder the file was dropped from, as it is', () => {
     const noRaw = rheomlXml({ sample: 'S', file: 'S', rawDataFile: null, segments: [frequencySweep(1)] })
-    expect(parseRheoML(noRaw, 'S.xml', '2026-10-06 HAGel D1 N2 (POR HACER)').sessionFolder).toBe('2026-10-06 HAGel D1 N2')
+    expect(parseRheoML(noRaw, 'S.xml', '2026-10-06 Ensayo (2)').sessionFolder).toBe('2026-10-06 Ensayo (2)')
     expect(parseRheoML(noRaw, 'S.xml').sessionFolder).toBe('Reologia')
   })
 
   it('rejects XML that is not from the rheometer', () => {
     expect(() => parseRheoML('<other/>', 'x.xml')).toThrow(NotRheoMLError)
     expect(() => parseRheoML('not xml', 'x.xml')).toThrow(NotRheoMLError)
-  })
-})
-
-describe('stripStatusMarker', () => {
-  it('removes only her status markers', () => {
-    expect(stripStatusMarker('2026-09-30 HAtyr Gel tyr Reologia 1D (YA HECHO)')).toBe('2026-09-30 HAtyr Gel tyr Reologia 1D')
-    expect(stripStatusMarker('Ensayo (2)')).toBe('Ensayo (2)')
   })
 })
