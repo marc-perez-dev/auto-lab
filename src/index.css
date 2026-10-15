@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  --color-stone-50: #f9f8f6;
+  --color-stone-100: #f2efe5;
+  --color-stone-200: #e6decc;
+  --color-stone-300: #d0c8b0;
+  --color-stone-400: #ae9f80;
+  --color-stone-500: #8c7e60;
+  --color-stone-600: #6b5f45;
+  --color-stone-700: #4f4633;
+  --color-stone-800: #3e3626;
+  --color-stone-900: #292419;
+
+  --color-earth-green: #5d6c42;
+  --color-earth-green-hover: #4a5634;
+}
+
+:root {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Merriweather', 'Georgia', serif;
+  background-color: var(--color-stone-100);
+  color: var(--color-stone-900);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-serif);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--color-stone-100);
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-md bg-earth-green px-4 py-2.5 font-semibold text-stone-50 transition-colors hover:bg-earth-green-hover disabled:cursor-wait disabled:opacity-70;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border-2 border-stone-900 bg-stone-50 px-4 py-2 font-semibold text-stone-900 transition-colors hover:bg-stone-200;
+  }
+
+  .card {
+    @apply rounded-lg border-2 border-stone-900 bg-stone-50 p-5 sm:p-6;
+  }
+}
