@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { DropZone } from './components/DropZone'
+import { Footer } from './components/Footer'
 import { SessionCard } from './components/SessionCard'
 import { WhatYouGet } from './components/WhatYouGet'
 import { processFiles, type PickedFile, type ProcessResult } from './lib/files'
@@ -38,14 +39,14 @@ export default function App() {
   const result = state.kind === 'done' ? state.result : null
 
   return (
-    <div className="min-h-screen bg-stone-100 text-stone-900 selection:bg-stone-200">
+    <div className="flex min-h-screen flex-col bg-stone-100 text-stone-900 selection:bg-stone-200">
       <header className="border-b-2 border-stone-900 px-4 py-5 sm:px-6">
         <div className="mx-auto max-w-3xl">
           <h1 className="text-2xl font-bold">Reología → Excel</h1>
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8 sm:px-6">
         {result === null ? (
           <>
             <p className="text-lg">
@@ -87,6 +88,8 @@ export default function App() {
           </>
         )}
       </main>
+
+      <Footer />
     </div>
   )
 }
