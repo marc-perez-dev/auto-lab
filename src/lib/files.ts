@@ -65,7 +65,7 @@ export async function processFiles(picked: PickedFile[]): Promise<ProcessResult>
       }
     }),
   )
-  const measurements = parsed.filter((p): p is Measurement => 'points' in p)
+  const measurements = parsed.filter((p): p is Measurement => 'segments' in p)
   const rejected = parsed.filter((p): p is ProcessResult['rejected'][number] => 'reason' in p)
   return { sessions: buildSessions(measurements), rejected }
 }

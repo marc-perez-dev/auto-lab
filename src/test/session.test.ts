@@ -1,26 +1,42 @@
 import { describe, expect, it } from 'vitest'
 import { parseRheoML } from '../lib/rheoml'
-import { averageGrid, buildSessions, columnLetter, excelSheetNames, rowsFromStartFrequency } from '../lib/session'
+import { averageGrid, buildSessions, columnLetter, excelSheetNames, frequencySweeps } from '../lib/session'
 import { amplitudeSweep, frequencySweep, rheomlXml, SWEEP_FREQUENCIES, type FixtureOptions } from './fixture'
 
 const parse = (o: FixtureOptions) => parseRheoML(rheomlXml(o), `${o.file}.xml`)
 
-describe('rowsFromStartFrequency', () => {
+describe('frequencySweeps', () => {
   it('ignores every row before the first one at 0.1 Hz', () => {
     const m = parse({ sample: 'S', file: 'S', segments: [amplitudeSweep(), frequencySweep(100)] })
-    const rows = rowsFromStartFrequency(m.points)!
+    const [rows] = frequencySweeps(m.segments)
     expect(rows).toHaveLength(20)
     expect(rows[0].Frequency).toBe(0.1)
     expect(rows[0].StorageModulus).toBe(100)
   })
 
-  it('tolerates rounding in the exported frequency', () => {
-    expect(rowsFromStartFrequency([{ Frequency: 1 }, { Frequency: 0.0999999 }, { Frequency: 0.125892 }])).toHaveLength(2)
+  it('stops at the end of the frequency sweep when other steps come after it', () => {
+    const m = parse({ sample: 'S', file: 'S', segments: [frequencySweep(100), amplitudeSweep()] })
+    const sweeps = frequencySweeps(m.segments)
+    expect(sweeps).toHaveLength(1)
+    expect(sweeps[0]).toHaveLength(20)
+    expect(sweeps[0][19].Frequency).toBe(7)
   })
 
-  it('returns null when there is no 0.1 Hz row', () => {
+  it('does not take a step held at 0.1 Hz for the sweep', () => {
+    const held = amplitudeSweep().map((p) => ({ ...p, frequency: 0.1 }))
+    const m = parse({ sample: 'S', file: 'S', segments: [held, frequencySweep(100)] })
+    const sweeps = frequencySweeps(m.segments)
+    expect(sweeps).toHaveLength(1)
+    expect(sweeps[0][0].StorageModulus).toBe(100)
+  })
+
+  it('tolerates rounding in the exported frequency', () => {
+    expect(frequencySweeps([[{ Frequency: 1 }, { Frequency: 0.0999999 }, { Frequency: 0.125892 }]])[0]).toHaveLength(2)
+  })
+
+  it('finds none when there is no 0.1 Hz row', () => {
     const m = parse({ sample: 'S', file: 'S', segments: [amplitudeSweep()] })
-    expect(rowsFromStartFrequency(m.points)).toBeNull()
+    expect(frequencySweeps(m.segments)).toEqual([])
   })
 })
 
@@ -57,7 +73,24 @@ describe('buildSessions', () => {
     const [s] = buildSessions([...day, parse({ sample: 'X', file: 'X', segments: [amplitudeSweep()] })])
     expect(s.measurements).toHaveLength(6)
     expect(s.samples.map((x) => x.name)).not.toContain('X')
-    expect(s.warnings).toEqual([expect.stringContaining('«X» no tiene ninguna fila a 0,1 Hz')])
+    expect(s.warnings).toEqual([expect.stringContaining('«X» no tiene ningún barrido de frecuencias que empiece a 0,1 Hz')])
+  })
+
+  it('averages only the frequency sweep when it is run first', () => {
+    const [s] = buildSessions([
+      parse({ sample: 'HAtyr 100', file: 'HAtyr 100', time: '10:00:00', segments: [frequencySweep(100), amplitudeSweep()] }),
+      parse({ sample: 'HAtyr 100', file: 'HAtyr 100 (1)', time: '10:10:00', segments: [frequencySweep(200)] }),
+    ])
+    expect(s.warnings).toEqual([])
+    expect(averageGrid(s.samples[0])).toHaveLength(1 + SWEEP_FREQUENCIES.length)
+  })
+
+  it('warns when a file has more than one frequency sweep and uses the first', () => {
+    const [s] = buildSessions([
+      parse({ sample: 'S', file: 'S', segments: [frequencySweep(100), amplitudeSweep(), frequencySweep(900)] }),
+    ])
+    expect(s.samples[0].replicates[0].rows[0].StorageModulus).toBe(100)
+    expect(s.warnings).toEqual([expect.stringContaining('«S» tiene 2 barridos de frecuencias')])
   })
 
   it('treats sample names differing only in case or spacing as the same sample', () => {

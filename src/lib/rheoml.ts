@@ -17,7 +17,8 @@ export interface Measurement {
   /** Every row flattened like Excel's "open XML as table" does. */
   rawHeader: string[]
   rawRows: RawCell[][]
-  points: Point[]
+  /** Points of each ExperimentalData segment (one per test step), in order. */
+  segments: Point[][]
 }
 
 export class NotRheoMLError extends Error {}
@@ -98,7 +99,7 @@ export function parseRheoML(xmlText: string, fileName: string, droppedFolder?: s
 
   const namer = new ColumnNamer()
   const fixed: Field[] = []
-  const segments = childElements(root).filter((el) => el.tagName === 'ExperimentalData')
+  const segmentEls = childElements(root).filter((el) => el.tagName === 'ExperimentalData')
   for (const child of childElements(root)) {
     if (child.tagName !== 'ExperimentalData') flattenFixedPart(child, namer, fixed)
   }
@@ -107,12 +108,12 @@ export function parseRheoML(xmlText: string, fileName: string, droppedFolder?: s
   // columns after the fixed part, in order of first appearance.
   const segmentAttrColumns = new Map<string, string>()
   const pointColumns = new Map<string, { value: string; attrs: string[]; attrColumns: string[] }>()
-  for (const segment of segments) {
+  for (const segment of segmentEls) {
     for (const attr of Array.from(segment.attributes)) {
       if (!segmentAttrColumns.has(attr.name)) segmentAttrColumns.set(attr.name, namer.name(attr.name))
     }
   }
-  for (const segment of segments) {
+  for (const segment of segmentEls) {
     for (const point of childElements(segment)) {
       for (const field of childElements(point)) {
         if (pointColumns.has(field.tagName)) continue
@@ -130,8 +131,10 @@ export function parseRheoML(xmlText: string, fileName: string, droppedFolder?: s
   ]
 
   const rawRows: RawCell[][] = []
-  const points: Point[] = []
-  for (const segment of segments) {
+  const segments: Point[][] = []
+  for (const segment of segmentEls) {
+    const points: Point[] = []
+    segments.push(points)
     const segmentCells = Array.from(segmentAttrColumns.keys()).map((attr) => toCell(segment.getAttribute(attr)))
     for (const pointEl of childElements(segment)) {
       const byTag = new Map(childElements(pointEl).map((f) => [f.tagName, f]))
@@ -160,6 +163,6 @@ export function parseRheoML(xmlText: string, fileName: string, droppedFolder?: s
     measuredAt: `${text('Source > Date')}T${text('Source > Time')}`,
     rawHeader,
     rawRows,
-    points,
+    segments,
   }
 }

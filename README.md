@@ -3,7 +3,7 @@
 Página web que convierte los `.xml` que exporta TRIOS (reómetro de TA Instruments) en dos Excel:
 
 - **`<carpeta>.xlsx`**: una pestaña por medida con todos sus datos, igual que al abrir el XML en Excel como tabla.
-- **`<carpeta> average.xlsx`**: una pestaña por muestra con G' (`StorageModulus`) y G'' (`LossModulus`) de cada réplica y su media (`=AVERAGE`). Solo se usan las filas a partir de la primera a 0,1 Hz.
+- **`<carpeta> average.xlsx`**: una pestaña por muestra con G' (`StorageModulus`) y G'' (`LossModulus`) de cada réplica y su media (`=AVERAGE`). Solo se usa el barrido de frecuencias: desde la primera fila a 0,1 Hz hasta el final de ese tramo del ensayo (da igual si va antes o después del resto).
 
 Los archivos se procesan en el navegador; no se suben a ningún sitio.
 

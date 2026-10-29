@@ -28,7 +28,7 @@ describe('parseRheoML', () => {
 
   it('keeps one row per data point, all segments included', () => {
     expect(m.rawRows).toHaveLength(36)
-    expect(m.points).toHaveLength(36)
+    expect(m.segments.map((points) => points.length)).toEqual([16, 20])
     expect(m.rawRows.every((r) => r.length === EXCEL_HEADER.length)).toBe(true)
   })
 

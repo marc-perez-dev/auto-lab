@@ -3,7 +3,7 @@
 
 import type { Measurement, Point } from './rheoml'
 
-/** Rows before the first one at this frequency are ignored for averages. */
+/** The frequency sweep used for averages starts at this frequency. */
 export const START_FREQUENCY_HZ = 0.1
 export const START_FREQUENCY_LABEL = `${String(START_FREQUENCY_HZ).replace('.', ',')} Hz`
 
@@ -12,7 +12,7 @@ const AVERAGED_FIELDS = ['StorageModulus', 'LossModulus'] as const
 
 export interface Replicate {
   measurement: Measurement
-  /** Rows from the first 0.1 Hz row on. */
+  /** Its frequency sweep, from the 0.1 Hz row on. */
   rows: Point[]
 }
 
@@ -42,9 +42,19 @@ const sampleKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase
 export const rawFileName = (session: Session) => `${session.folder}.xlsx`
 export const averageFileName = (session: Session) => `${session.folder} average.xlsx`
 
-export function rowsFromStartFrequency(points: Point[]): Point[] | null {
-  const start = points.findIndex((p) => sameFrequency(p[FREQUENCY], START_FREQUENCY_HZ))
-  return start === -1 ? null : points.slice(start)
+/**
+ * Frequency sweeps: in each segment (test step), the rows from the first
+ * 0.1 Hz one to the end of the segment, if the frequency changes along them.
+ * Works whether the sweep comes before or after the other test steps; a step
+ * held at a fixed 0.1 Hz is not a sweep.
+ */
+export function frequencySweeps(segments: Point[][]): Point[][] {
+  return segments.flatMap((points) => {
+    const start = points.findIndex((p) => sameFrequency(p[FREQUENCY], START_FREQUENCY_HZ))
+    if (start === -1) return []
+    const rows = points.slice(start)
+    return rows.some((p) => !sameFrequency(p[FREQUENCY], START_FREQUENCY_HZ)) ? [rows] : []
+  })
 }
 
 /**
@@ -108,12 +118,17 @@ function buildSession(folder: string, measurements: Measurement[]): Session {
 
   const bySample = new Map<string, { name: string; replicates: Replicate[] }>()
   for (const measurement of ordered) {
-    const rows = rowsFromStartFrequency(measurement.points)
+    const [rows, ...otherSweeps] = frequencySweeps(measurement.segments)
     if (!rows) {
       warnings.push(
-        `«${measurement.fileName}» no tiene ninguna fila a ${START_FREQUENCY_LABEL}: está en el Excel completo pero no en el de medias.`,
+        `«${measurement.fileName}» no tiene ningún barrido de frecuencias que empiece a ${START_FREQUENCY_LABEL}: está en el Excel completo pero no en el de medias.`,
       )
       continue
+    }
+    if (otherSweeps.length > 0) {
+      warnings.push(
+        `«${measurement.fileName}» tiene ${otherSweeps.length + 1} barridos de frecuencias: en el Excel de medias solo se usa el primero.`,
+      )
     }
     const key = sampleKey(measurement.sampleName)
     const group = bySample.get(key) ?? { name: measurement.sampleName, replicates: [] }

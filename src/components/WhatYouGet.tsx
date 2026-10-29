@@ -30,7 +30,7 @@ export function WhatYouGet() {
         <div className="rounded-lg border border-stone-300 bg-stone-50 p-4">
           <h3 className="font-bold">Excel de medias</h3>
           <p className="text-stone-700">
-            Una pestaña por muestra, con G′ y G″ de cada réplica y su media, desde {START_FREQUENCY_LABEL}.
+            Una pestaña por muestra, con G′ y G″ de cada réplica y su media, solo del barrido de frecuencias (desde {START_FREQUENCY_LABEL}).
           </p>
           <SheetTabs tabs={['Muestra A', 'Muestra B', '…']} />
         </div>
